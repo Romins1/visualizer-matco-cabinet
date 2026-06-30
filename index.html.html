@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visor 3D - Stand Publicitario</title>
+    <!-- Tailwind CSS para el diseño de la interfaz de usuario -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Librería Three.js para renderizado 3D -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Control de órbita para poder rotar con el ratón o pantalla táctil -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Fuente Inter elegante -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow: hidden;
+            background-color: #0f172a;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body class="relative w-screen h-screen text-slate-200">
+
+    <!-- Canvas de renderizado 3D -->
+    <div id="canvas-container" class="absolute inset-0 w-full h-full z-0"></div>
+
+    <!-- UI - Cabecera Superior -->
+    <div class="absolute top-6 left-6 z-10 bg-slate-900/80 backdrop-blur-md p-4 rounded-2xl border border-slate-700/50 shadow-2xl max-w-sm">
+        <div class="flex items-center gap-3">
+            <span class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
+            <h1 class="text-lg font-bold tracking-tight text-white">Visualizador 3D</h1>
+        </div>
+        <p class="text-xs text-slate-400 mt-1">Estructura rectangular interactiva a escala real.</p>
+        <div class="mt-3 flex gap-2 text-[10px] font-mono text-slate-300">
+            <span class="bg-slate-800 px-2 py-1 rounded">Ancho: 500 mm</span>
+            <span class="bg-slate-800 px-2 py-1 rounded">Profundo: 500 mm</span>
+            <span class="bg-slate-800 px-2 py-1 rounded">Alto: 2000 mm</span>
+        </div>
+    </div>
+
+    <!-- UI - Panel de Control Lateral (Carga de Texturas e Instrucciones) -->
+    <div class="absolute top-6 right-6 z-10 w-80 bg-slate-900/90 backdrop-blur-md p-5 rounded-2xl border border-slate-700/50 shadow-2xl flex flex-col gap-4">
+        <div>
+            <h2 class="text-sm font-semibold text-white">Cargar Texturas de Inkscape</h2>
+            <p class="text-xs text-slate-400 mt-1">Si abres el archivo directamente haciendo doble clic, carga tus imágenes aquí para esquivar el bloqueo de seguridad del navegador:</p>
+        </div>
+
+        <div class="flex flex-col gap-3 text-xs">
+            <!-- Frontal -->
+            <div class="bg-slate-800/50 p-2 rounded-lg border border-slate-700 flex flex-col gap-1">
+                <span class="font-medium text-slate-300">1. Cara Frontal</span>
+                <input type="file" id="file-front" accept="image/*" class="w-full text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 file:cursor-pointer cursor-pointer text-[10px]">
+                <span class="text-[9px] text-slate-500" id="name-front">Esperando: carafrontal.png</span>
+            </div>
+
+            <!-- Trasera -->
+            <div class="bg-slate-800/50 p-2 rounded-lg border border-slate-700 flex flex-col gap-1">
+                <span class="font-medium text-slate-300">2. Cara Trasera</span>
+                <input type="file" id="file-back" accept="image/*" class="w-full text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 file:cursor-pointer cursor-pointer text-[10px]">
+                <span class="text-[9px] text-slate-500" id="name-back">Esperando: caratrasera.png</span>
+            </div>
+
+            <!-- Lateral Izquierdo -->
+            <div class="bg-slate-800/50 p-2 rounded-lg border border-slate-700 flex flex-col gap-1">
+                <span class="font-medium text-slate-300">3. Lateral Izquierdo</span>
+                <input type="file" id="file-left" accept="image/*" class="w-full text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 file:cursor-pointer cursor-pointer text-[10px]">
+                <span class="text-[9px] text-slate-500" id="name-left">Esperando: caralateral1.png</span>
+            </div>
+
+            <!-- Lateral Derecho -->
+            <div class="bg-slate-800/50 p-2 rounded-lg border border-slate-700 flex flex-col gap-1">
+                <span class="font-medium text-slate-300">4. Lateral Derecho</span>
+                <input type="file" id="file-right" accept="image/*" class="w-full text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 file:cursor-pointer cursor-pointer text-[10px]">
+                <span class="text-[9px] text-slate-500" id="name-right">Esperando: caralateral2.png</span>
+            </div>
+        </div>
+
+        <div class="border-t border-slate-800 pt-3">
+            <h3 class="text-xs font-semibold text-slate-300 mb-1">Cómo controlar la cámara:</h3>
+            <ul class="text-[11px] text-slate-400 list-disc list-inside space-y-1">
+                <li><strong class="text-slate-300">Rotar:</strong> Clic izquierdo + arrastrar</li>
+                <li><strong class="text-slate-300">Zoom:</strong> Rueda del ratón (scroll)</li>
+                <li><strong class="text-slate-300">Mover cámara:</strong> Clic derecho + arrastrar</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- UI - Barra de Estado de Texturas Cargadas -->
+    <div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 bg-slate-900/90 backdrop-blur-md px-6 py-3 rounded-full border border-slate-700/50 shadow-2xl flex items-center gap-4 text-xs">
+        <span class="text-slate-400 font-medium">Estado de caras:</span>
+        <div class="flex gap-2">
+            <span id="badge-front" class="px-2 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30 text-[10px]">Frontal</span>
+            <span id="badge-back" class="px-2 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30 text-[10px]">Trasera</span>
+            <span id="badge-left" class="px-2 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30 text-[10px]">Lat 1</span>
+            <span id="badge-right" class="px-2 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30 text-[10px]">Lat 2</span>
+            <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 text-[10px]">Techo (Negro)</span>
+            <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 text-[10px]">Base (Negro)</span>
+        </div>
+    </div>
+
+    <script>
+        // Configuración básica de Three.js
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0f172a); // Fondo azul oscuro tecnológico
+
+        // Cámara perspectiva con un buen campo de visión
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(25, 15, 35); // Posicionada de lado y con altura para ver la perspectiva
+
+        // Renderizador con antialiasing para esquinas perfectas sin dientes de sierra
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true; // Activar sombras para darle volumen
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // Configuración de iluminación tipo estudio fotográfico
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6); // Luz general suave
+        scene.add(ambientLight);
+
+        // Luz direccional principal (simula foco frontal derecho) con sombras
+        const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight1.position.set(15, 30, 20);
+        dirLight1.castShadow = true;
+        dirLight1.shadow.mapSize.width = 2048;
+        dirLight1.shadow.mapSize.height = 2048;
+        dirLight1.shadow.camera.near = 0.5;
+        dirLight1.shadow.camera.far = 100;
+        const d = 15;
+        dirLight1.shadow.camera.left = -d;
+        dirLight1.shadow.camera.right = d;
+        dirLight1.shadow.camera.top = d;
+        dirLight1.shadow.camera.bottom = -d;
+        scene.add(dirLight1);
+
+        // Luz de relleno lateral izquierdo para evitar sombras 100% negras
+        const dirLight2 = new THREE.DirectionalLight(0xa5b4fc, 0.3); // Tono azulado frío
+        dirLight2.position.set(-20, 15, -10);
+        scene.add(dirLight2);
+
+        // Suelo para dar sensación de peso y proyectar las sombras
+        const floorGeo = new THREE.PlaneGeometry(100, 100);
+        const floorMat = new THREE.ShadowMaterial({ opacity: 0.4 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = -10; // Colocar en la base del stand
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        // Rejilla de referencia en el suelo
+        const gridHelper = new THREE.GridHelper(60, 60, 0x334155, 0x1e293b);
+        gridHelper.position.y = -9.99; // Ligeramente por encima de la sombra
+        scene.add(gridHelper);
+
+        // Definición de dimensiones proporcionales basadas en tus medidas reales (500x500x2000 mm)
+        // Usamos una escala dividida por 100 para trabajar cómodamente en Three.js (5 x 20 x 5 unidades)
+        const width = 5;
+        const height = 20;
+        const depth = 5;
+
+        const geometry = new THREE.BoxGeometry(width, height, depth);
+        
+        // Creación del cargador de texturas de Three.js
+        const textureLoader = new THREE.TextureLoader();
+
+        // 1. Crear materiales base (inicialmente colores sólidos hasta que cargues tus diseños)
+        const defaultMaterial = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 });
+        const blackMaterial = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.9, metalness: 0.1 }); // Techo y base negros opacos
+
+        // Array de 6 materiales para cada cara del cubo
+        // Orden de caras en Three.js: Right, Left, Top, Bottom, Front, Back
+        const materials = [
+            defaultMaterial.clone(), // 0: Lateral Derecho (+X) -> caralateral2.png
+            defaultMaterial.clone(), // 1: Lateral Izquierdo (-X) -> caralateral1.png
+            blackMaterial,           // 2: Techo (+Y) -> Negro Sólido
+            blackMaterial,           // 3: Base (-Y) -> Negro Sólido
+            defaultMaterial.clone(), // 4: Frontal (+Z) -> carafrontal.png
+            defaultMaterial.clone()  // 5: Trasera (-Z) -> caratrasera.png
+        ];
+
+        const totem = new THREE.Mesh(geometry, materials);
+        totem.position.y = 0; // Centrado. El suelo está en -10, por lo que la base descansa perfectamente en el suelo.
+        totem.castShadow = true;
+        totem.receiveShadow = true;
+        scene.add(totem);
+
+        // Inicializar controles de cámara orbitales
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; // Rotación fluida con inercia
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 + 0.1; // No permitir que la cámara baje del suelo
+        controls.minDistance = 5; // Zoom máximo
+        controls.maxDistance = 60; // Zoom mínimo
+
+        // Bucle de animación a 60fps
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update(); // Necesario para el damping
+            renderer.render(scene, camera);
+        }
+
+        // Control de redimensionamiento de ventana adaptable a móviles y PC
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Función para actualizar una textura del material con un archivo cargado
+        function updateFaceTexture(faceIndex, file, badgeId, labelId, placeholderName) {
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const texture = new THREE.Texture(img);
+                    texture.needsUpdate = true;
+                    
+                    // Ajustes para evitar deformación o repetición mosaico
+                    texture.wrapS = THREE.ClampToEdgeWrapping;
+                    texture.wrapT = THREE.ClampToEdgeWrapping;
+                    
+                    // Crear nuevo material físico para esa cara concreta
+                    materials[faceIndex] = new THREE.MeshStandardMaterial({
+                        map: texture,
+                        roughness: 0.3,
+                        metalness: 0.1
+                    });
+                    
+                    totem.material = materials; // Forzar actualización de materiales en la malla
+                    
+                    // Actualizar interfaz visual
+                    const badge = document.getElementById(badgeId);
+                    badge.classList.remove('bg-red-500/20', 'text-red-400', 'border-red-500/30');
+                    badge.classList.add('bg-emerald-500/20', 'text-emerald-400', 'border-emerald-500/30');
+                    
+                    document.getElementById(labelId).innerText = `Cargado: ${file.name}`;
+                    document.getElementById(labelId).classList.add('text-emerald-400');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Vincular los inputs del panel de carga de archivos
+        document.getElementById('file-front').addEventListener('change', function(e) {
+            updateFaceTexture(4, e.target.files[0], 'badge-front', 'name-front');
+        });
+        document.getElementById('file-back').addEventListener('change', function(e) {
+            updateFaceTexture(5, e.target.files[0], 'badge-back', 'name-back');
+        });
+        document.getElementById('file-left').addEventListener('change', function(e) {
+            updateFaceTexture(1, e.target.files[0], 'badge-left', 'name-left');
+        });
+        document.getElementById('file-right').addEventListener('change', function(e) {
+            updateFaceTexture(0, e.target.files[0], 'badge-right', 'name-right');
+        });
+
+        // Intentar carga automática local por si se corre en un servidor local
+        const autoloaderFiles = [
+            { path: 'caralateral2.png', index: 0, badge: 'badge-right', label: 'name-right' },
+            { path: 'caralateral1.png', index: 1, badge: 'badge-left', label: 'name-left' },
+            { path: 'carafrontal.png', index: 4, badge: 'badge-front', label: 'name-front' },
+            { path: 'caratrasera.png', index: 5, badge: 'badge-back', label: 'name-back' }
+        ];
+
+        autoloaderFiles.forEach(file => {
+            textureLoader.load(file.path, 
+                // Éxito: se cargó la textura automáticamente
+                function(texture) {
+                    texture.wrapS = THREE.ClampToEdgeWrapping;
+                    texture.wrapT = THREE.ClampToEdgeWrapping;
+                    materials[file.index] = new THREE.MeshStandardMaterial({
+                        map: texture,
+                        roughness: 0.3
+                    });
+                    totem.material = materials;
+                    const badge = document.getElementById(file.badge);
+                    badge.classList.remove('bg-red-500/20', 'text-red-400', 'border-red-500/30');
+                    badge.classList.add('bg-emerald-500/20', 'text-emerald-400', 'border-emerald-500/30');
+                    document.getElementById(file.label).innerText = `Auto-cargado: ${file.path}`;
+                    document.getElementById(file.label).classList.add('text-emerald-400');
+                },
+                // Progreso (no necesario)
+                undefined,
+                // Error: CORS o archivo no encontrado (esperable si corre de forma local estricta sin servidor)
+                function(err) {
+                    console.log(`Carga automática de ${file.path} omitida (requiere servidor local o cargador manual).`);
+                }
+            );
+        });
+
+        // Arrancar la simulación 3D una vez cargada la pantalla
+        window.onload = function() {
+            animate();
+        };
+    </script>
+</body>
+</html>
